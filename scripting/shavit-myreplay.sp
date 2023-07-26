@@ -64,6 +64,7 @@ public void OnPluginStart()
 
     RegConsoleCmd("sm_preview", Command_Preview, "Preview your unfinished replay");
 
+    RegAdminCmd("sm_reload_replays", Command_ReloadReplays, ADMFLAG_RCON, "Reloads the replays in the folder");
     RegAdminCmd("sm_myreplay_debug", Command_Debug, ADMFLAG_ROOT);
 
     gSM_Replays = new StringMap();
@@ -142,7 +143,6 @@ public void OnMapStart()
 
     if(!StrEqual(gS_Map, gS_PreviousMap, false))
     {
-        gSM_Replays.Clear();
         GetReplayList();
     }
 }
@@ -705,6 +705,7 @@ void GetReplayList()
     FormatEx(personalReplayFolder, sizeof(personalReplayFolder), "%s/copy", replayFolder);
 
     gI_NumReplays = 0;
+    gSM_Replays.Clear();
 
     DirectoryListing personalReplayDir = OpenDirectory(personalReplayFolder);
 
@@ -883,6 +884,13 @@ bool GetClientFrameCache(int client, frame_cache_t frames)
     strcopy(frames.sReplayName, MAX_NAME_LENGTH, name);
 
     return true;
+}
+
+public Action Command_ReloadReplays(int client, int args)
+{
+    GetReplayList();
+
+    return Plugin_Handled;
 }
 
 public Action Command_Debug(int client, int args)
