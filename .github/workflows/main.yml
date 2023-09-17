@@ -7,24 +7,26 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      matrix:
+        sm-version: [ "1.11.x", "1.12.x" ]
     permissions:
       contents: write
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set environment variables
         run: echo SCRIPTS_PATH=$(pwd) >> $GITHUB_ENV
 
-      - name: Setup SourcePawn Compiler ${{ matrix.SM_VERSION }}
+      - name: Setup SourcePawn Compiler ${{ matrix.sm-version }}
         id: setup_sp
         uses: rumblefrog/setup-sp@master
         with:
-          version: "1.12.x"
+          version: ${{ matrix.sm-version }}
           version-file: ./scripting/shavit-myreplay.sp
 
       - name: Checkout Shavit's bhoptimer
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: shavitush/bhoptimer
           ref: master
@@ -54,7 +56,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
+          tag: ${{ matrix.sm-version }}
           artifacts: "${{ github.event.repository.name }}-${{ steps.setup_sp.outputs.plugin-version }}.zip"
           draft: false
           allowUpdates: true
