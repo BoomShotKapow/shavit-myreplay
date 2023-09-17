@@ -43,6 +43,8 @@ public Plugin myinfo =
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
+    CreateNative("Shavit_GetPersonalReplay", Native_GetPersonalReplay);
+
     RegPluginLibrary("shavit-myreplay");
 
     gB_Late = late;
@@ -819,21 +821,7 @@ public Action Shavit_OnCheckpointMenuSelect(int client, int param2, char[] info,
 {
     if(StrEqual(info, "preview"))
     {
-        PrintDebug("Command_Preview: %N", client);
-
-        frame_cache_t frames;
-
-        if(!GetClientFrameCache(client, frames))
-        {
-            Shavit_PrintToChat(client, "Failed to get current frame cache!");
-        }
-
-        int bot = Shavit_StartReplayFromFrameCache(Shavit_GetBhopStyle(client), Shavit_GetClientTrack(client), -1.0, client, -1, Replay_Dynamic, true, frames);
-
-        if(bot == 0)
-        {
-            Shavit_PrintToChat(client, "Failed to start preview!");
-        }
+        Preview(client);
     }
 
     return Plugin_Continue;
@@ -846,12 +834,19 @@ public Action Command_Preview(int client, int args)
         return Plugin_Handled;
     }
 
+    Preview(client);
+
+    return Plugin_Handled;
+}
+
+void Preview(int client)
+{
     frame_cache_t frames;
 
     if(!GetClientFrameCache(client, frames))
     {
         Shavit_PrintToChat(client, "Failed to get current frame cache!");
-        return Plugin_Handled;
+        return;
     }
 
     int bot = Shavit_StartReplayFromFrameCache(Shavit_GetBhopStyle(client), Shavit_GetClientTrack(client), -1.0, client, -1, Replay_Dynamic, true, frames);
@@ -860,8 +855,6 @@ public Action Command_Preview(int client, int args)
     {
         Shavit_PrintToChat(client, "Failed to start preview!");
     }
-
-    return Plugin_Handled;
 }
 
 bool GetClientFrameCache(int client, frame_cache_t frames)
@@ -921,4 +914,18 @@ stock void PrintDebug(const char[] message, any...)
             return;
         }
     }
+}
+
+public int Native_GetPersonalReplay(Handle handler, int numParams)
+{
+    if(GetNativeCell(3) != sizeof(PersonalReplay))
+    {
+        return ThrowNativeError(200, "PersonalReplay does not match latest(got %i expected %i). Please update your includes and recompile your plugins",
+            GetNativeCell(3), sizeof(PersonalReplay));
+    }
+
+    PersonalReplay replay;
+    GetPersonalReplay(replay, GetNativeCell(1));
+
+    return SetNativeArray(2, replay, sizeof(replay));
 }
