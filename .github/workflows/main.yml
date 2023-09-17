@@ -40,10 +40,6 @@ jobs:
           echo ${{ steps.setup_sp.outputs.plugin-version }}
         working-directory: ${{ env.SCRIPTS_PATH }}/scripting
 
-      - name: Changelog
-        id: changelog
-        uses: mindsers/changelog-reader-action@v2
-
       - name: Install zip
         uses: montudor/action-zip@v1
 
@@ -60,7 +56,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
           artifacts: "${{ github.event.repository.name }}-${{ steps.setup_sp.outputs.plugin-version }}.zip"
-          body: ${{ steps.changelog.outputs.changes }}
           draft: false
           allowUpdates: true
           prerelease: false
