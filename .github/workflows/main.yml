@@ -47,7 +47,7 @@ jobs:
 
       - name: Zip output
         run: |
-          zip -qq -y -r ${{ github.event.repository.name }}-${{ steps.setup_sp.outputs.plugin-version }}.zip configs plugins scripting extensions gamedata translations data
+          zip -qq -y -r ${{ github.event.repository.name }}-${{ steps.setup_sp.outputs.plugin-version }}-sm${{ matrix.sm-version }}.zip configs plugins scripting extensions gamedata translations data
         working-directory: ${{ env.SCRIPTS_PATH }}
 
       - name: Create Release
