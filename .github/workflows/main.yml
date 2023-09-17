@@ -56,8 +56,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ matrix.sm-version }}
-          artifacts: "${{ github.event.repository.name }}-${{ steps.setup_sp.outputs.plugin-version }}.zip"
+          tag: ${{ steps.setup_sp.outputs.plugin-version }}
+          artifacts: "${{ github.event.repository.name }}-${{ steps.setup_sp.outputs.plugin-version }}-sm${{ matrix.sm-version }}.zip"
           draft: false
           allowUpdates: true
           prerelease: false
