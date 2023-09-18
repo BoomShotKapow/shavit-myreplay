@@ -35,10 +35,10 @@
 1. Grab the latest release from the release page and unzip it in your SourceMod folder.
 2. Restart the server or type `sm plugins load shavit-myreplay` in the console to load the plugin.
 
-## Commands ##
+## Usage ##
 | Command | Description |
 | ----------- | ----------- |
-| sm_rewatch | Rewatch your personal replay |
-| sm_watch | Watch another user's personal replay |
-| sm_deletepr | Delete your personal replay |
-| sm_preview | Preview your unfinished replay |
+| `sm_rewatch` | Rewatch your personal replay |
+| `sm_watch` | Watch another user's personal replay |
+| `sm_deletepr` | Delete your personal replay |
+| `sm_preview` | Preview your unfinished replay |
