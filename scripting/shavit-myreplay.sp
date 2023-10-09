@@ -37,7 +37,7 @@ public Plugin myinfo =
     name        = "shavit - Personal Replays",
     author      = "BoomShot",
     description = "Allows a user to watch their replay after finishing the map.",
-    version     = "1.0.0",
+    version     = "1.0.1",
     url         = "https://github.com/BoomShotKapow/shavit-myreplay"
 };
 
@@ -265,6 +265,11 @@ public Action Shavit_ShouldSaveReplayCopy(int client, int style, float time, int
 {
     if(!gB_ReplayRecorder || isbestreplay || istoolong || !gB_ShowMenu[client])
     {
+        if(!gB_ShowMenu[client])
+        {
+            PrintDebug("Shavit_ShouldSaveReplayCopy: %N || Menu is disabled", client);
+        }
+
         return Plugin_Continue;
     }
 
@@ -287,17 +292,14 @@ public void Shavit_OnReplaySaved(int client, int style, float time, int jumps, i
 
         replay_header_t header;
 
-        //Set the player's personal replay to their best replay
-        if(replay.GetHeader(header))
+        //Set the player's personal replay to their best replay if they don't have one
+        if(!replay.GetHeader(header))
         {
-            if(header.iSteamID != 0 && replay.auth == header.iSteamID && (header.iStyle == style && header.iTrack == track))
-            {
-                PrintDebug("Copying [%s] to [%s]", replaypath, path);
+            PrintDebug("Copying [%s] to [%s]", replaypath, path);
 
-                if(CopyReplayFile(replaypath, path))
-                {
-                    SavePersonalReplay(client);
-                }
+            if(CopyReplayFile(replaypath, path))
+            {
+                SavePersonalReplay(client);
             }
         }
 
@@ -394,8 +396,6 @@ public int PersonalReplay_MenuHandler(Menu menu, MenuAction action, int param1, 
             PersonalReplay replay;
             GetPersonalReplay(replay, param1);
 
-            replay.Reset(param1);
-
             char replayPath[PLATFORM_MAX_PATH];
             replay.GetPath(replayPath, sizeof(replayPath));
 
@@ -405,40 +405,42 @@ public int PersonalReplay_MenuHandler(Menu menu, MenuAction action, int param1, 
             char info[16];
             if(menu.GetItem(param2, info, sizeof(info)))
             {
-                if(StrEqual(info, "yes"))
+                if(StrEqual(info, "yes") || StrEqual(info, "save"))
                 {
+                    char option[8];
+                    option = StrEqual(info, "yes") ? "Yes" : "Save";
+
+                    if(DeleteFile(replayPath))
+                    {
+                        PrintDebug("[%s] Deleting file: [%s]", option, replayPath);
+                    }
+
                     //Change temporary file name to permanent
                     if(RenameFile(replayPath, tempPath))
                     {
-                        SavePersonalReplay(param1);
-                        StartPersonalReplay(param1, replay.sAuth);
+                        PrintDebug("[%s] Renaming file: [%s] to [%s]", option, tempPath, replayPath);
 
-                        PrintDebug("[Yes]: [%s]", replayPath);
-                    }
-                }
-                else if(StrEqual(info, "no"))
-                {
-                    if(DeleteFile(tempPath))
-                    {
-                        PrintDebug("[No]: Deleting file: [%s]", tempPath);
-                    }
-                }
-                else if(StrEqual(info, "save"))
-                {
-                    if(RenameFile(replayPath, tempPath))
-                    {
                         SavePersonalReplay(param1);
 
-                        PrintDebug("[Save]: [%s]", replayPath);
+                        if(StrEqual(info, "yes"))
+                        {
+                            StartPersonalReplay(param1, replay.sAuth);
+                        }
                     }
                 }
-                else if(StrEqual(info, "stop"))
+                else if(StrEqual(info, "no") || StrEqual(info, "stop"))
                 {
-                    gB_ShowMenu[param1] = false;
+                    char option[8];
+                    option = StrEqual(info, "no") ? "No" : "Stop";
+
+                    if(StrEqual(info, "stop"))
+                    {
+                        gB_ShowMenu[param1] = false;
+                    }
 
                     if(DeleteFile(tempPath))
                     {
-                        PrintDebug("[Stop]: gB_ShowMenu [%b] || Deleting file: [%s]", gB_ShowMenu[param1], tempPath);
+                        PrintDebug("[%s]: Deleting file: [%s]", option, tempPath);
                     }
                 }
             }
@@ -446,7 +448,7 @@ public int PersonalReplay_MenuHandler(Menu menu, MenuAction action, int param1, 
             //Re-display the client's menu if they're on seg/TAS
             if(Shavit_GetStyleSettingBool(Shavit_GetBhopStyle(param1), "segments"))
             {
-                ClientCommand(param1, "sm_cp");
+                FakeClientCommand(param1, "sm_cp");
             }
         }
 
@@ -494,25 +496,33 @@ public int PersonalReplay_MenuHandler(Menu menu, MenuAction action, int param1, 
     return 0;
 }
 
-void GetPersonalReplay(PersonalReplay replay, int client = 0, const char[] auth = "")
+bool GetPersonalReplay(PersonalReplay replay, int client = 0, const char[] auth = "")
 {
     PersonalReplay emptyReplay;
     replay = emptyReplay;
 
+    if(client == 0 && auth[0] == '\0')
+    {
+        return false;
+    }
+
+    char sAuth[64];
+
     if(client != 0)
     {
-        char sAuth[64];
-        if(GetClientAccountID(client, sAuth, sizeof(sAuth)))
+        if(!GetClientAccountID(client, sAuth, sizeof(sAuth)))
         {
-            gSM_Replays.GetArray(sAuth, replay, sizeof(replay));
-            replay.Reset(client);
+            return false;
         }
     }
     else if(auth[0] != '\0')
     {
-        gSM_Replays.GetArray(auth, replay, sizeof(replay));
-        replay.Reset(_, StringToInt(auth));
+        strcopy(sAuth, sizeof(sAuth), auth);
     }
+
+    replay.Reset(client, StringToInt(sAuth));
+
+    return gSM_Replays.GetArray(sAuth, replay, sizeof(replay));
 }
 
 void StartPersonalReplay(int client, const char[] sAuth)
@@ -894,7 +904,7 @@ public Action Command_Debug(int client, int args)
     return Plugin_Handled;
 }
 
-stock void PrintDebug(const char[] message, any...)
+stock void PrintDebug(const char[] message, any ...)
 {
     if(!gB_Debug)
     {
@@ -904,14 +914,23 @@ stock void PrintDebug(const char[] message, any...)
     char buffer[255];
     VFormat(buffer, sizeof(buffer), message, 2);
 
-    PrintToServer(buffer);
+    if(strlen(buffer) >= 255)
+    {
+        PrintToServer(buffer);
+    }
 
     for(int client = 1; client <= MaxClients; client++)
     {
         if(IsClientConnected(client) && CheckCommandAccess(client, "sm_myreplay_debug", ADMFLAG_ROOT))
         {
-            PrintToChat(client, buffer);
-            return;
+            if(strlen(buffer) >= 255)
+            {
+                PrintToConsole(client, buffer);
+            }
+            else
+            {
+                PrintToChat(client, buffer);
+            }
         }
     }
 }
