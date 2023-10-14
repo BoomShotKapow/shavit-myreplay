@@ -1,5 +1,9 @@
 #include <sourcemod>
-#include <shavit>
+#include <shavit/core>
+#include <shavit/wr>
+#include <shavit/replay-file>
+#include <shavit/replay-playback>
+#include <shavit/replay-recorder>
 #include <myreplay>
 
 #pragma newdecls required
@@ -37,7 +41,7 @@ public Plugin myinfo =
     name        = "shavit - Personal Replays",
     author      = "BoomShot",
     description = "Allows a user to watch their replay after finishing the map.",
-    version     = "1.0.1",
+    version     = "1.0.2",
     url         = "https://github.com/BoomShotKapow/shavit-myreplay"
 };
 
@@ -302,8 +306,6 @@ public void Shavit_OnReplaySaved(int client, int style, float time, int jumps, i
                 SavePersonalReplay(client);
             }
         }
-
-        return;
     }
 
     char tempPath[PLATFORM_MAX_PATH];
