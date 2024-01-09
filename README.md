@@ -42,3 +42,4 @@
 | `sm_watch` | Watch another user's personal replay |
 | `sm_deletepr` | Delete your personal replay |
 | `sm_preview` | Preview your unfinished replay |
+| `sm_myreplay` | Toggles the display of the personal replay menu |
