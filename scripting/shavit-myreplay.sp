@@ -5,6 +5,7 @@
 #include <shavit/replay-playback>
 #include <shavit/replay-recorder>
 #include <myreplay>
+#include <clientprefs>
 
 #pragma newdecls required
 #pragma semicolon 1
@@ -36,12 +37,14 @@ int gI_NumReplays;
 
 stylestrings_t gS_StyleStrings[STYLE_LIMIT];
 
+Cookie gC_ShowMenuCookie = null;
+
 public Plugin myinfo =
 {
     name        = "shavit - Personal Replays",
     author      = "BoomShot",
     description = "Allows a user to watch their replay after finishing the map.",
-    version     = "1.0.2",
+    version     = "1.0.3",
     url         = "https://github.com/BoomShotKapow/shavit-myreplay"
 };
 
@@ -61,14 +64,17 @@ public void OnPluginStart()
     gH_Forwards_OnPersonalReplaySaved = new GlobalForward("Shavit_OnPersonalReplaySaved", ET_Ignore, Param_Cell, Param_Cell, Param_Cell, Param_String);
     gH_Forwards_OnPersonalReplayDeleted = new GlobalForward("Shavit_OnPersonalReplayDeleted", ET_Ignore, Param_Cell);
 
+    gC_ShowMenuCookie = new Cookie("sm_myreplay_showmenu", "Toggles the display of the menu.", CookieAccess_Protected);
+
     RegConsoleCmd("sm_rewatch", Command_Rewatch, "Rewatch your personal replay");
-    RegConsoleCmd("sm_myreplay", Command_Rewatch, "Rewatch your personal replay");
 
     RegConsoleCmd("sm_watch", Command_Watch, "Watch another user's personal replay");
 
     RegConsoleCmd("sm_deletepr", Command_DeleteReplay, "Delete your personal replay");
 
     RegConsoleCmd("sm_preview", Command_Preview, "Preview your unfinished replay");
+
+    RegConsoleCmd("sm_myreplay", Command_MyReplay, "Toggles the display of the personal replay menu.");
 
     RegAdminCmd("sm_reload_replays", Command_ReloadReplays, ADMFLAG_RCON, "Reloads the replays in the folder");
     RegAdminCmd("sm_myreplay_debug", Command_Debug, ADMFLAG_ROOT);
@@ -167,6 +173,19 @@ public void OnClientPutInServer(int client)
 
     gB_ShowMenu[client] = true;
     gB_MenuDelayed[client] = false;
+
+    if(AreClientCookiesCached(client))
+    {
+        OnClientCookiesCached(client);
+    }
+}
+
+public void OnClientCookiesCached(int client)
+{
+    char cookie[4];
+
+    gC_ShowMenuCookie.Get(client, cookie, sizeof(cookie));
+    gB_ShowMenu[client] = (strlen(cookie) > 0) ? view_as<bool>(StringToInt(cookie)) : true;
 }
 
 public void OnClientDisconnect(int client)
@@ -894,6 +913,16 @@ bool GetClientFrameCache(int client, frame_cache_t frames)
 public Action Command_ReloadReplays(int client, int args)
 {
     GetReplayList();
+
+    return Plugin_Handled;
+}
+
+public Action Command_MyReplay(int client, int args)
+{
+    gB_ShowMenu[client] = !gB_ShowMenu[client];
+    Shavit_PrintToChat(client, "MyReplay: %s", gB_ShowMenu[client] ? "Enabled" : "Disabled");
+
+    gC_ShowMenuCookie.Set(client, gB_ShowMenu[client] ? "1" : "0");
 
     return Plugin_Handled;
 }
