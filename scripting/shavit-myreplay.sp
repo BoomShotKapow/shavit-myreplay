@@ -345,35 +345,34 @@ public void Shavit_OnReplaySaved(int client, int style, float time, int jumps, i
 
 bool CopyReplayFile(const char[] from, const char[] to)
 {
+    // Open the source file for reading in binary mode
     File original = OpenFile(from, "rb");
-
     if(original == null)
     {
-        LogError("[MyReplay] Failed to read replay file: [%s]!", from);
+        LogError("[MyReplay] Failed to open replay file for reading: [%s]!", from);
         return false;
     }
 
+    // Open the destination file for writing in binary mode
     File copy = OpenFile(to, "wb");
-
     if(copy == null)
     {
+        LogError("[MyReplay] Failed to open replay file for writing: [%s]!", to);
         delete original;
-
-        LogError("[MyReplay] Failed to write replay file: [%s]!", to);
         return false;
     }
 
-    original.Seek(0, SEEK_SET);
-
+    // Buffer to hold file data
     int buffer[256];
 
+    // Copy data from original file to the new file
     while(!original.EndOfFile())
     {
-        int read = original.Read(buffer, sizeof(buffer), 1);
-
-        copy.Write(buffer, read, 1);
+        int bytesRead = original.Read(buffer, sizeof(buffer), 1);
+        copy.Write(buffer, bytesRead, 1);
     }
 
+    // Clean up
     delete original;
     delete copy;
 
