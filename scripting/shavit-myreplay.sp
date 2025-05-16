@@ -35,6 +35,8 @@ float gF_MenuDelayTime = 1.75;
 
 int gI_NumReplays;
 
+frame_cache_t gA_FrameCache[MAXPLAYERS + 1];
+
 stylestrings_t gS_StyleStrings[STYLE_LIMIT];
 
 Cookie gC_ShowMenuCookie = null;
@@ -563,9 +565,11 @@ void StartPersonalReplay(int client, const char[] sAuth)
     char replayPath[PLATFORM_MAX_PATH];
     replay.GetPath(replayPath, sizeof(replayPath));
 
-    PrintDebug("StartPersonalReplay: Paths: [%s]", replayPath);
+    LoadReplayCache(gA_FrameCache[client], header.iStyle, header.iTrack, replayPath, gS_Map);
 
-    int bot = Shavit_StartReplayFromFile(header.iStyle, header.iTrack, -1.0, client, -1, Replay_Dynamic, true, replayPath);
+    strcopy(gA_FrameCache[client].sReplayName, MAX_NAME_LENGTH, replay.username);
+
+    int bot = Shavit_StartReplayFromFrameCache(header.iStyle, header.iTrack, -1.0, client, -1, Replay_Dynamic, true, gA_FrameCache[client]);
 
     if(bot == 0)
     {
