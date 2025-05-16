@@ -80,7 +80,7 @@ enum struct PersonalReplay
         if(GetClientAccountID(client, this.sAuth, sizeof(this.sAuth)))
         {
             this.auth = StringToInt(this.sAuth);
-            SanerGetClientName(client, this.username);
+            GetClientName(client, this.username, sizeof(this.username));
         }
     }
 }
