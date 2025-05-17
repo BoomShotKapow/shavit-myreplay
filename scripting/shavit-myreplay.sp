@@ -69,13 +69,9 @@ public void OnPluginStart()
     gC_ShowMenuCookie = new Cookie("sm_myreplay_showmenu", "Toggles the display of the menu.", CookieAccess_Protected);
 
     RegConsoleCmd("sm_rewatch", Command_Rewatch, "Rewatch your personal replay");
-
     RegConsoleCmd("sm_watch", Command_Watch, "Watch another user's personal replay");
-
     RegConsoleCmd("sm_deletepr", Command_DeleteReplay, "Delete your personal replay");
-
     RegConsoleCmd("sm_preview", Command_Preview, "Preview your unfinished replay");
-
     RegConsoleCmd("sm_myreplay", Command_MyReplay, "Toggles the display of the personal replay menu.");
 
     RegAdminCmd("sm_reload_replays", Command_ReloadReplays, ADMFLAG_RCON, "Reloads the replays in the folder");
@@ -430,17 +426,12 @@ public int PersonalReplay_MenuHandler(Menu menu, MenuAction action, int param1, 
             {
                 if(StrEqual(info, "yes") || StrEqual(info, "save"))
                 {
-                    char option[8];
-                    option = StrEqual(info, "yes") ? "Yes" : "Save";
-
-                    if(DeleteFile(replayPath))
-                    {
-                        PrintDebug("[%s] Deleting file: [%s]", option, replayPath);
-                    }
-
                     //Change temporary file name to permanent
                     if(RenameFile(replayPath, tempPath))
                     {
+                        char option[8];
+                        option = StrEqual(info, "yes") ? "Yes" : "Save";
+
                         PrintDebug("[%s] Renaming file: [%s] to [%s]", option, tempPath, replayPath);
 
                         SavePersonalReplay(param1);
@@ -575,28 +566,6 @@ void StartPersonalReplay(int client, const char[] sAuth)
     {
         Shavit_PrintToChat(client, "Replay bot is unavailable! Try again when it's available.");
         return;
-    }
-
-    char query[192];
-    FormatEx(query, sizeof(query), "SELECT name FROM %susers WHERE auth = %d;", gS_SQLPrefix, header.iSteamID);
-
-    QueryLog(gH_ShavitDB, SQL_GetUserName_Callback, query, bot);
-}
-
-public void SQL_GetUserName_Callback(Database db, DBResultSet results, const char[] error, int bot)
-{
-    if(results == null)
-    {
-        LogError("[MyReplay] Get user name failed. Reason: %s", error);
-        return;
-    }
-
-    if(results.FetchRow())
-    {
-        char replayName[MAX_NAME_LENGTH];
-        results.FetchString(0, replayName, sizeof(replayName));
-
-        Shavit_SetReplayCacheName(bot, replayName);
     }
 }
 

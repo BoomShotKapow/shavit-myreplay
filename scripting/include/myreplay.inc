@@ -108,7 +108,7 @@ forward void Shavit_OnPersonalReplayDeleted(int client);
 
 /**
  * Retrieves the personal replay data for the specified client.
- * 
+ *
  * @param client                    Client index.
  * @param replay                    Buffer to store personal replay data in sizeof(PersonalReplay)
  * @param size                      Size of the personal replay buffer, e.g sizeof(PersonalReplay)
