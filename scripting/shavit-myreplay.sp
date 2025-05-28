@@ -1048,6 +1048,11 @@ public int MyReplay_MenuHandler(Menu menu, MenuAction action, int param1, int pa
                 gB_AutoWatch[param1] = !gB_AutoWatch[param1];
                 gC_AutoWatchCookie.Set(param1, gB_AutoWatch[param1] ? "1" : "0");
             }
+
+            if(!StrEqual(info, "delete"))
+            {
+                CreateMyReplayMenu(param1);
+            }
         }
 
         case MenuAction_Cancel:
@@ -1080,10 +1085,8 @@ public int DeleteConfirm_MenuHandler(Menu menu, MenuAction action, int param1, i
                     PrintDebug("Deleting personal replay failed.");
                 }
             }
-            else
-            {
-                CreateMyReplayMenu(param1);
-            }
+
+            CreateMyReplayMenu(param1);
         }
 
         case MenuAction_Cancel:
