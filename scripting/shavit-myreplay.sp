@@ -29,6 +29,8 @@ bool gB_Connected;
 bool gB_ReplayPlayback;
 bool gB_ReplayRecorder;
 bool gB_ShowMenu[MAXPLAYERS + 1] = {true, ... };
+bool gB_AutoSave[MAXPLAYERS + 1];
+bool gB_AutoWatch[MAXPLAYERS + 1];
 bool gB_MenuDelayed[MAXPLAYERS + 1];
 
 float gF_MenuDelayTime = 1.75;
@@ -40,6 +42,8 @@ frame_cache_t gA_FrameCache[MAXPLAYERS + 1];
 stylestrings_t gS_StyleStrings[STYLE_LIMIT];
 
 Cookie gC_ShowMenuCookie = null;
+Cookie gC_AutoSaveCookie = null;
+Cookie gC_AutoWatchCookie = null;
 
 public Plugin myinfo =
 {
@@ -67,6 +71,8 @@ public void OnPluginStart()
     gH_Forwards_OnPersonalReplayDeleted = new GlobalForward("Shavit_OnPersonalReplayDeleted", ET_Ignore, Param_Cell);
 
     gC_ShowMenuCookie = new Cookie("sm_myreplay_showmenu", "Toggles the display of the menu.", CookieAccess_Protected);
+    gC_AutoSaveCookie = new Cookie("sm_myreplay_autosave", "Toggles the auto saving of personal replays.", CookieAccess_Protected);
+    gC_AutoWatchCookie = new Cookie("sm_myreplay_autowatch", "Toggles the auto watching of personal replays.", CookieAccess_Protected);
 
     RegConsoleCmd("sm_rewatch", Command_Rewatch, "Rewatch your personal replay");
     RegConsoleCmd("sm_watch", Command_Watch, "Watch another user's personal replay");
@@ -170,6 +176,8 @@ public void OnClientPutInServer(int client)
     }
 
     gB_ShowMenu[client] = true;
+    gB_AutoSave[client] = false;
+    gB_AutoWatch[client] = false;
     gB_MenuDelayed[client] = false;
 
     if(AreClientCookiesCached(client))
@@ -184,6 +192,12 @@ public void OnClientCookiesCached(int client)
 
     gC_ShowMenuCookie.Get(client, cookie, sizeof(cookie));
     gB_ShowMenu[client] = (strlen(cookie) > 0) ? view_as<bool>(StringToInt(cookie)) : true;
+
+    gC_AutoSaveCookie.Get(client, cookie, sizeof(cookie));
+    gB_AutoSave[client] = (strlen(cookie) > 0) ? view_as<bool>(StringToInt(cookie)) : false;
+
+    gC_AutoWatchCookie.Get(client, cookie, sizeof(cookie));
+    gB_AutoWatch[client] = (strlen(cookie) > 0) ? view_as<bool>(StringToInt(cookie)) : false;
 }
 
 public void OnClientDisconnect(int client)
@@ -235,8 +249,8 @@ public void Shavit_OnStyleConfigLoaded(int styles)
 
 public Action Shavit_OnFinishPre(int client, timer_snapshot_t snapshot)
 {
-    //Prevent menu from displaying when it's a new WR
-    if(!gB_ShowMenu[client] || Shavit_GetRankForTime(snapshot.bsStyle, snapshot.fCurrentTime, snapshot.iTimerTrack) == 1)
+    //Prevent menu from displaying when it's a new WR or if using autosave
+    if(!gB_ShowMenu[client] || Shavit_GetRankForTime(snapshot.bsStyle, snapshot.fCurrentTime, snapshot.iTimerTrack) == 1 || gB_AutoSave[client])
     {
         return Plugin_Continue;
     }
@@ -302,42 +316,80 @@ public void Shavit_OnReplaySaved(int client, int style, float time, int jumps, i
     PersonalReplay replay;
     GetPersonalReplay(replay, client);
 
+    char path[PLATFORM_MAX_PATH];
+    replay.GetPath(path, sizeof(path));
+
+    replay_header_t header;
+
+    PrintDebug("Shavit_OnReplaySaved: %N || time: %f || isbestreplay: %b || iscopy: %b", client, time, isbestreplay, iscopy);
+
     if(!gB_ReplayRecorder || istoolong || (!isbestreplay && !iscopy) || !gB_ShowMenu[client])
     {
         return;
     }
     else if(isbestreplay)
     {
-        char path[PLATFORM_MAX_PATH];
-        replay.GetPath(path, sizeof(path));
-
-        replay_header_t header;
-
         //Set the player's personal replay to their best replay if they don't have one
-        if(!replay.GetHeader(header))
+        //Or auto save the better replay
+        if(!replay.GetHeader(header) || (gB_AutoSave[client] && header.fTime > time && header.iStyle == style && header.iTrack == track))
         {
-            PrintDebug("Copying [%s] to [%s]", replaypath, path);
+            PrintDebug("Copying file: [%s] to [%s]", replaypath, path);
 
             if(CopyReplayFile(replaypath, path))
             {
                 SavePersonalReplay(client);
+
+                if(gB_AutoWatch[client])
+                {
+                    StartPersonalReplay(client, replay.sAuth);
+                }
+            }
+        }
+
+        return;
+    }
+
+    if(gB_AutoSave[client])
+    {
+        if(!replay.GetHeader(header) || (header.fTime > time && header.iStyle == style && header.iTrack == track))
+        {
+            PrintDebug("Renaming file: [%s] to [%s]", replaypath, path);
+
+            //Rename file to permanent
+            if(RenameFile(path, replaypath))
+            {
+                SavePersonalReplay(client);
+
+                if(gB_AutoWatch[client])
+                {
+                    StartPersonalReplay(client, replay.sAuth);
+                }
+            }
+        }
+        else
+        {
+            if(DeleteFile(replaypath))
+            {
+                PrintDebug("Deleting worse replay: [%s]", replaypath);
             }
         }
     }
-
-    char tempPath[PLATFORM_MAX_PATH];
-    replay.GetPath(tempPath, sizeof(tempPath), true);
-
-    PrintDebug("Renaming: [%s] to [%s]", replaypath, tempPath);
-
-    //Rename file so that we can reference it later
-    RenameFile(tempPath, replaypath);
-
-    if(gM_ReplayMenu[client] != null)
+    else
     {
-        gM_ReplayMenu[client].RemoveItem(1);
-        gM_ReplayMenu[client].InsertItem(1, "yes", "Yes");
-        gM_ReplayMenu[client].Display(client, 20);
+        char tempPath[PLATFORM_MAX_PATH];
+        replay.GetPath(tempPath, sizeof(tempPath), true);
+
+        PrintDebug("Renaming file: [%s] to [%s]", replaypath, tempPath);
+
+        //Rename file to temp so that we can reference it later
+        RenameFile(tempPath, replaypath);
+
+        if(gM_ReplayMenu[client] != null)
+        {
+            gM_ReplayMenu[client].RemoveItem(1);
+            gM_ReplayMenu[client].InsertItem(1, "yes", "Yes");
+            gM_ReplayMenu[client].Display(client, 20);
+        }
     }
 }
 
@@ -351,7 +403,7 @@ bool CopyReplayFile(const char[] from, const char[] to)
         return false;
     }
 
-    File copy = OpenFile(to, "wb");
+    File copy = OpenFile(to, "wb+");
 
     if(copy == null)
     {
@@ -361,15 +413,18 @@ bool CopyReplayFile(const char[] from, const char[] to)
         return false;
     }
 
-    original.Seek(0, SEEK_SET);
+    if(!original.Seek(0, SEEK_SET))
+    {
+        return false;
+    }
 
     int buffer[256];
 
     while(!original.EndOfFile())
     {
-        int read = original.Read(buffer, sizeof(buffer), 1);
+        int read = original.Read(buffer, sizeof(buffer), 4);
 
-        copy.Write(buffer, read, 1);
+        copy.Write(buffer, read, 4);
     }
 
     delete original;
@@ -665,6 +720,21 @@ public Action Command_Watch(int client, int args)
 
 public Action Command_DeleteReplay(int client, int args)
 {
+    if(!IsValidClient(client))
+    {
+        return Plugin_Handled;
+    }
+
+    if(!DeletePersonalReplay(client))
+    {
+        PrintDebug("Deleting personal replay failed.");
+    }
+
+    return Plugin_Handled;
+}
+
+bool DeletePersonalReplay(int client)
+{
     PersonalReplay replay;
     GetPersonalReplay(replay, client);
 
@@ -672,12 +742,12 @@ public Action Command_DeleteReplay(int client, int args)
     if(!replay.GetHeader(header))
     {
         Shavit_PrintToChat(client, "Your personal replay doesn't exist!");
-        return Plugin_Handled;
+        return false;
     }
     else if(replay.auth != header.iSteamID)
     {
         LogError("[MyReplay] Deleting personal replay failed.");
-        return Plugin_Handled;
+        return false;
     }
 
     char replayPath[PLATFORM_MAX_PATH];
@@ -699,7 +769,7 @@ public Action Command_DeleteReplay(int client, int args)
 
     Shavit_PrintToChat(client, "Your personal replay has been deleted!");
 
-    return Plugin_Handled;
+    return true;
 }
 
 void GetReplayList()
@@ -892,12 +962,138 @@ public Action Command_ReloadReplays(int client, int args)
 
 public Action Command_MyReplay(int client, int args)
 {
-    gB_ShowMenu[client] = !gB_ShowMenu[client];
-    Shavit_PrintToChat(client, "MyReplay: %s", gB_ShowMenu[client] ? "Enabled" : "Disabled");
+    if(!IsValidClient(client))
+    {
+        return Plugin_Handled;
+    }
 
-    gC_ShowMenuCookie.Set(client, gB_ShowMenu[client] ? "1" : "0");
+    if(!CreateMyReplayMenu(client))
+    {
+        LogError("[MyReplay] Failed to create menu!");
+    }
 
     return Plugin_Handled;
+}
+
+bool CreateMyReplayMenu(int client)
+{
+    Menu menu = new Menu(MyReplay_MenuHandler);
+    menu.SetTitle("MyReplay Settings:\n");
+
+    menu.AddItem("enabled", gB_ShowMenu[client] ? "[X] Enabled" : "[ ] Enabled");
+    menu.AddItem("-1", "", ITEMDRAW_SPACER);
+
+    menu.AddItem("watch", "Watch Replay");
+    menu.AddItem("delete", "Delete Replay");
+    menu.AddItem("-1", "", ITEMDRAW_SPACER);
+
+    menu.AddItem("autosave", gB_AutoSave[client] ? "[X] Auto Save" : "[ ] Auto Save");
+    menu.AddItem("autowatch", gB_AutoWatch[client] ? "[X] Auto Watch" : "[ ] Auto Watch", (gB_AutoSave[client] ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED));
+
+    return menu.Display(client, MENU_TIME_FOREVER);
+}
+
+public int MyReplay_MenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+    switch(action)
+    {
+        case MenuAction_Select:
+        {
+            char info[64];
+            menu.GetItem(param2, info, sizeof(info));
+
+            if(StrEqual(info, "enabled"))
+            {
+                gB_ShowMenu[param1] = !gB_ShowMenu[param1];
+                gC_ShowMenuCookie.Set(param1, gB_ShowMenu[param1] ? "1" : "0");
+            }
+            else if(StrEqual(info, "watch"))
+            {
+                char sAuth[64];
+                if(GetClientAccountID(param1, sAuth, sizeof(sAuth)))
+                {
+                    StartPersonalReplay(param1, sAuth);
+                }
+            }
+            else if(StrEqual(info, "delete"))
+            {
+                Menu subMenu = new Menu(DeleteConfirm_MenuHandler);
+                subMenu.SetTitle("Delete personal replay?\n");
+                subMenu.ExitBackButton = true;
+
+                for(int i = 1; i <= GetRandomInt(1, 4); i++)
+                {
+                    subMenu.AddItem("-1", "NO!");
+                }
+
+                subMenu.AddItem("1", "YES! DELETE PERSONAL REPLAY!");
+
+                for(int i = 1; i <= GetRandomInt(1, 3); i++)
+                {
+                    subMenu.AddItem("-1", "NO!");
+                }
+
+                subMenu.Display(param1, 300);
+            }
+            else if(StrEqual(info, "autosave"))
+            {
+                gB_AutoSave[param1] = !gB_AutoSave[param1];
+                gC_AutoSaveCookie.Set(param1, gB_AutoSave[param1] ? "1" : "0");
+            }
+            else if(StrEqual(info, "autowatch"))
+            {
+                gB_AutoWatch[param1] = !gB_AutoWatch[param1];
+                gC_AutoWatchCookie.Set(param1, gB_AutoWatch[param1] ? "1" : "0");
+            }
+        }
+
+        case MenuAction_Cancel:
+        {
+            if(param2 == MenuCancel_ExitBack)
+            {
+                delete menu;
+            }
+        }
+    }
+
+    return 0;
+}
+
+public int DeleteConfirm_MenuHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+    switch(action)
+    {
+        case MenuAction_Select:
+        {
+            char info[64];
+            menu.GetItem(param2, info, sizeof(info));
+
+            int choice = StringToInt(info);
+
+            if(choice != -1)
+            {
+                if(!DeletePersonalReplay(param1))
+                {
+                    PrintDebug("Deleting personal replay failed.");
+                }
+            }
+            else
+            {
+                CreateMyReplayMenu(param1);
+            }
+        }
+
+        case MenuAction_Cancel:
+        {
+            if(param2 == MenuCancel_ExitBack)
+            {
+                CreateMyReplayMenu(param1);
+                delete menu;
+            }
+        }
+    }
+
+    return 0;
 }
 
 public Action Command_Debug(int client, int args)
