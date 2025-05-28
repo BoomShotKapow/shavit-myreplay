@@ -27,13 +27,19 @@
 
 
 ## Requirements ##
-- Sourcemod and Metamod
+- SourceMod and MetaMod
 - [Shavit's bhop timer](https://github.com/shavitush/bhoptimer)
 
+## Optional Requirements ##
+- [observer-mode-switch-lag-fix](https://github.com/PMArkive/random-shavit-bhoptimer-stuff/blob/main/observer-mode-switch-lag-fix.sp)
 
 ## Installation ##
 1. Grab the latest release from the release page and unzip it in your SourceMod folder.
 2. Restart the server or type `sm plugins load shavit-myreplay` in the console to load the plugin.
+
+## Information ##
+- The personal replays are stored in the "replayfolder" variable of shavit-replay.cfg, inside the copy folder.
+- Each personal replay is saved in the format: {replayfolder}/copy/{auth}_{mapname}.replay
 
 ## Usage ##
 | Command | Description |
@@ -42,4 +48,4 @@
 | `sm_watch` | Watch another user's personal replay |
 | `sm_deletepr` | Delete your personal replay |
 | `sm_preview` | Preview your unfinished replay |
-| `sm_myreplay` | Toggles the display of the personal replay menu |
+| `sm_myreplay` | Displays the MyReplay customization menu |
