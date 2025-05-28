@@ -615,6 +615,9 @@ void StartPersonalReplay(int client, const char[] sAuth)
 
     strcopy(gA_FrameCache[client].sReplayName, MAX_NAME_LENGTH, replay.username);
 
+    //Use fake client command with observer-mode-switch-lag-fix plugin to prevent lag while spectating
+    FakeClientCommand(client, "sm_spec");
+
     int bot = Shavit_StartReplayFromFrameCache(header.iStyle, header.iTrack, -1.0, client, -1, Replay_Dynamic, true, gA_FrameCache[client]);
 
     if(bot == 0)
