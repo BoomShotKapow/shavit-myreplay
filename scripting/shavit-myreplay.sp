@@ -296,22 +296,28 @@ public Action Timer_MenuDelay(Handle timer, any data)
     return Plugin_Stop;
 }
 
-public Action Shavit_ShouldSaveReplayCopy(int client, int style, float time, int jumps, int strafes, float sync, int track, float oldtime, float perfs, float avgvel, float maxvel, int timestamp, bool isbestreplay, bool istoolong)
+public void Shavit_AddAdditionalReplayPathsHere(int client, int style, float time, int jumps, int strafes, float sync, int track, float oldtime, float perfs, float avgvel, float maxvel, int timestamp, bool isbestreplay, bool istoolong)
 {
-    if(!gB_ReplayRecorder || isbestreplay || istoolong || !gB_ShowMenu[client])
+    if(!gB_ReplayRecorder || istoolong || !gB_ShowMenu[client])
     {
         if(!gB_ShowMenu[client])
         {
-            PrintDebug("Shavit_ShouldSaveReplayCopy: %N || Menu is disabled", client);
+            PrintDebug("Shavit_AddAdditionalReplayPathsHere: %N || Menu is disabled", client);
         }
 
-        return Plugin_Continue;
+        return;
     }
 
-    return Plugin_Changed;
+    PersonalReplay replay;
+    GetPersonalReplay(replay, client);
+    char tempPath[PLATFORM_MAX_PATH];
+    replay.GetPath(tempPath, sizeof(tempPath), true);
+
+    Shavit_AlsoSaveReplayTo(tempPath);
+    PrintDebug("Shavit_AddAdditionalReplayPathsHere: Added path [%s]", tempPath);
 }
 
-public void Shavit_OnReplaySaved(int client, int style, float time, int jumps, int strafes, float sync, int track, float oldtime, float perfs, float avgvel, float maxvel, int timestamp, bool isbestreplay, bool istoolong, bool iscopy, const char[] replaypath, ArrayList frames, int preframes, int postframes, const char[] name)
+public void Shavit_OnReplaySaved(int client, int style, float time, int jumps, int strafes, float sync, int track, float oldtime, float perfs, float avgvel, float maxvel, int timestamp, bool isbestreplay, bool istoolong, ArrayList replaypaths, ArrayList frames, int preframes, int postframes, const char[] name)
 {
     PersonalReplay replay;
     GetPersonalReplay(replay, client);
@@ -319,47 +325,33 @@ public void Shavit_OnReplaySaved(int client, int style, float time, int jumps, i
     char path[PLATFORM_MAX_PATH];
     replay.GetPath(path, sizeof(path));
 
-    replay_header_t header;
+    char replaypath[PLATFORM_MAX_PATH];
+    if(replaypaths != null && replaypaths.Length > 0)
+    {
+        replaypaths.GetString(0, replaypath, sizeof(replaypath));
+    }
 
-    PrintDebug("Shavit_OnReplaySaved: %N || time: %f || isbestreplay: %b || iscopy: %b", client, time, isbestreplay, iscopy);
-
-    if(!gB_ReplayRecorder || istoolong || (!isbestreplay && !iscopy) || !gB_ShowMenu[client])
+    if(!gB_ReplayRecorder || istoolong || !gB_ShowMenu[client])
     {
         return;
     }
-    else if(isbestreplay)
-    {
-        //Set the player's personal replay to their best replay if they don't have one
-        //Or auto save the better replay
-        if(!replay.GetHeader(header) || (gB_AutoSave[client] && header.fTime > time && header.iStyle == style && header.iTrack == track))
-        {
-            PrintDebug("Copying file: [%s] to [%s]", replaypath, path);
 
-            if(CopyReplayFile(replaypath, path))
-            {
-                SavePersonalReplay(client);
+    char permPath[PLATFORM_MAX_PATH];
+    replay.GetPath(permPath, sizeof(permPath));
 
-                if(gB_AutoWatch[client])
-                {
-                    StartPersonalReplay(client, replay.sAuth);
-                }
-            }
-        }
+    char tempPath[PLATFORM_MAX_PATH];
+    replay.GetPath(tempPath, sizeof(tempPath), true);
 
-        return;
-    }
+    replay_header_t replayHeader;
 
     if(gB_AutoSave[client])
     {
-        if(!replay.GetHeader(header) || (header.fTime > time && header.iStyle == style && header.iTrack == track))
+        if(!replay.GetHeader(replayHeader) || (replayHeader.fTime > time && replayHeader.iStyle == style && replayHeader.iTrack == track))
         {
-            PrintDebug("Renaming file: [%s] to [%s]", replaypath, path);
-
-            //Rename file to permanent
-            if(RenameFile(path, replaypath))
+            PrintDebug("Renaming file: [%s] to [%s]", tempPath, permPath);
+            if(RenameFile(permPath, tempPath))
             {
                 SavePersonalReplay(client);
-
                 if(gB_AutoWatch[client])
                 {
                     StartPersonalReplay(client, replay.sAuth);
@@ -368,22 +360,14 @@ public void Shavit_OnReplaySaved(int client, int style, float time, int jumps, i
         }
         else
         {
-            if(DeleteFile(replaypath))
+            if(DeleteFile(tempPath))
             {
-                PrintDebug("Deleting worse replay: [%s]", replaypath);
+                PrintDebug("Deleting worse replay: [%s]", tempPath);
             }
         }
     }
     else
     {
-        char tempPath[PLATFORM_MAX_PATH];
-        replay.GetPath(tempPath, sizeof(tempPath), true);
-
-        PrintDebug("Renaming file: [%s] to [%s]", replaypath, tempPath);
-
-        //Rename file to temp so that we can reference it later
-        RenameFile(tempPath, replaypath);
-
         if(gM_ReplayMenu[client] != null)
         {
             gM_ReplayMenu[client].RemoveItem(1);
@@ -391,46 +375,6 @@ public void Shavit_OnReplaySaved(int client, int style, float time, int jumps, i
             gM_ReplayMenu[client].Display(client, 20);
         }
     }
-}
-
-bool CopyReplayFile(const char[] from, const char[] to)
-{
-    File original = OpenFile(from, "rb");
-
-    if(original == null)
-    {
-        LogError("[MyReplay] Failed to read replay file: [%s]!", from);
-        return false;
-    }
-
-    File copy = OpenFile(to, "wb+");
-
-    if(copy == null)
-    {
-        delete original;
-
-        LogError("[MyReplay] Failed to write replay file: [%s]!", to);
-        return false;
-    }
-
-    if(!original.Seek(0, SEEK_SET))
-    {
-        return false;
-    }
-
-    int buffer[256];
-
-    while(!original.EndOfFile())
-    {
-        int read = original.Read(buffer, sizeof(buffer), 4);
-
-        copy.Write(buffer, read, 4);
-    }
-
-    delete original;
-    delete copy;
-
-    return true;
 }
 
 void SavePersonalReplay(int client)
@@ -1154,3 +1098,5 @@ public int Native_GetPersonalReplay(Handle handler, int numParams)
 
     return SetNativeArray(2, replay, sizeof(replay));
 }
+
+native void Shavit_AlsoSaveReplayTo(const char[] path);
