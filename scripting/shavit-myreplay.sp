@@ -50,7 +50,7 @@ public Plugin myinfo =
     name        = "shavit - Personal Replays",
     author      = "BoomShot",
     description = "Allows a user to watch their replay after finishing the map.",
-    version     = "1.0.4",
+    version     = "1.0.5",
     url         = "https://github.com/BoomShotKapow/shavit-myreplay"
 };
 
