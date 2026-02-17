@@ -57,6 +57,7 @@ public Plugin myinfo =
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
     CreateNative("Shavit_GetPersonalReplay", Native_GetPersonalReplay);
+    CreateNative("Shavit_GetCachedReplayName", Native_GetCachedReplayName);
 
     RegPluginLibrary("shavit-myreplay");
 
@@ -349,6 +350,8 @@ public void Shavit_OnReplaySaved(int client, int style, float time, int jumps, i
         if(!replay.GetHeader(replayHeader) || (replayHeader.fTime > time && replayHeader.iStyle == style && replayHeader.iTrack == track))
         {
             PrintDebug("Renaming file: [%s] to [%s]", tempPath, permPath);
+        	float fStart = GetEngineTime();
+
             if(RenameFile(permPath, tempPath))
             {
                 SavePersonalReplay(client);
@@ -357,6 +360,8 @@ public void Shavit_OnReplaySaved(int client, int style, float time, int jumps, i
                     StartPersonalReplay(client, replay.sAuth);
                 }
             }
+            
+            PrintDebug("[DEBUG] MyReplay execution time: %.4f seconds", GetEngineTime() - fStart);
         }
         else
         {
@@ -881,6 +886,12 @@ void Preview(int client)
 bool GetClientFrameCache(int client, frame_cache_t frames)
 {
     ArrayList aFrames = Shavit_GetReplayData(client);
+    
+    if(aFrames == null || aFrames.Length == 0)
+    {
+        return false;
+    }
+    
     frames.aFrames = view_as<ArrayList>(CloneHandle(aFrames));
 
     frames.fTime = Shavit_GetClientTime(client);
@@ -1099,4 +1110,20 @@ public int Native_GetPersonalReplay(Handle handler, int numParams)
     return SetNativeArray(2, replay, sizeof(replay));
 }
 
-native void Shavit_AlsoSaveReplayTo(const char[] path);
+public int Native_GetCachedReplayName(Handle handler, int numParams)
+{
+    int auth = GetNativeCell(1);
+    int maxlen = GetNativeCell(3);
+
+    char sAuth[64];
+    IntToString(auth, sAuth, sizeof(sAuth));
+
+    PersonalReplay replay;
+    if(gSM_Replays.GetArray(sAuth, replay, sizeof(replay)))
+    {
+        SetNativeString(2, replay.username, maxlen);
+        return true;
+    }
+
+    return false;
+}
